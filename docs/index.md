@@ -30,6 +30,8 @@ SQLite
 
 [PostgreSQL (JVM)](jvm_postgresql) (Experimental)
 
+[PostgreSQL (Native)](https://github.com/hfhbd/postgres-native-sqldelight) (Experimental)
+
 [HSQL/H2 (JVM)](jvm_h2) (Experimental)
 
 ## Snapshots
