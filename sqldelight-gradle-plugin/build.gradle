@@ -45,8 +45,8 @@ dependencies {
   implementation deps.schemaCrawler.tools
   implementation deps.schemaCrawler.sqlite
 
-  shade project(':sqlite-migrations')
-  shade project(':sqldelight-compiler')
+  implementation project(':sqlite-migrations')
+  implementation project(':sqldelight-compiler')
   shade deps.intellij.analysis
   shade deps.intellij.core
   shade deps.intellij.java
@@ -131,7 +131,7 @@ validatePlugins {
   enableStricterValidation = true
 }
 
-if (System.getenv("CI") == "true") {
+if (true) {
   apply plugin: 'com.github.johnrengelman.shadow'
 
   configurations.compileOnly.extendsFrom(configurations.shade)
