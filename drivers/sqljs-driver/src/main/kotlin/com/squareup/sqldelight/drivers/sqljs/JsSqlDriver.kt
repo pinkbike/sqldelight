@@ -93,6 +93,11 @@ private class JsSqlCursor(private val statement: Statement) : SqlCursor {
   }
   override fun getDouble(index: Int): Double? = statement.get()[index]
   override fun close() { statement.freemem() }
+  override fun getColumnsCount(): Int = statement.getColumnNames().size
+
+  override fun getColumnName(index: Int): String = statement.getColumnNames()[index]
+
+  override fun getType(index: Int): Int = -1
 }
 
 private class JsSqlPreparedStatement : SqlPreparedStatement {

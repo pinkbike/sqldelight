@@ -276,4 +276,7 @@ private class AndroidCursor(
   override fun getBytes(index: Int) = if (cursor.isNull(index)) null else cursor.getBlob(index)
   override fun getDouble(index: Int) = if (cursor.isNull(index)) null else cursor.getDouble(index)
   override fun close() = cursor.close()
+  override fun getColumnsCount(): Int = cursor.columnCount
+  override fun getColumnName(index: Int): String? = cursor.getColumnName(index)
+  override fun getType(index: Int): Int = cursor.getType(index)
 }

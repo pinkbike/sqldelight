@@ -219,4 +219,9 @@ open class JdbcCursor(
     onClose()
   }
   override fun next() = resultSet.next()
+  override fun getColumnsCount(): Int = -1
+
+  override fun getColumnName(index: Int) = null
+
+  override fun getType(index: Int): Int = -1
 }

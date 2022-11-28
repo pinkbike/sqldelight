@@ -30,4 +30,11 @@ internal class SqliterSqlCursor(
   override fun getString(index: Int): String? = cursor.getStringOrNull(index)
 
   override fun next(): Boolean = cursor.next()
+
+  override fun getColumnsCount(): Int = cursor.columnCount
+
+  override fun getColumnName(index: Int): String = cursor.columnName(index)
+
+  override fun getType(index: Int): Int = cursor.getType(index).nativeCode
+
 }

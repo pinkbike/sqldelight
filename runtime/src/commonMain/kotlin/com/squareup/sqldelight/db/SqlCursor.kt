@@ -47,4 +47,19 @@ interface SqlCursor : Closeable {
    * @return The double or null value of column [index] for the current row of the result set.
    */
   fun getDouble(index: Int): Double?
+
+  /**
+   * @return The column count for the current result set.
+   */
+  fun getColumnsCount(): Int
+
+  /**
+   * @return The column name or null at the selected [index]for the current result set.
+   */
+  fun getColumnName(index: Int): String?
+
+  /**
+   * @return The column name or null at the selected [index]for the current result set.
+   */
+  fun getType(index: Int): Int
 }
