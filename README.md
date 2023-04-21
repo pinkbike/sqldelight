@@ -20,7 +20,7 @@ Build locally with:
 This is to prevent the team to rebuild everything each time they need it!
 
 ```shell
-cp -R ~/.m2/repository/com <current-checkout-of-trailforks-map-app>/platforms/android/tf-shared/sqldelight-repository
+cp -R ~/.m2/repository/com <current-checkout-of-trailforks-map-app>/platforms/android/trailforks-kmm/tf-shared/sqldelight-repository
 ```
 
 
