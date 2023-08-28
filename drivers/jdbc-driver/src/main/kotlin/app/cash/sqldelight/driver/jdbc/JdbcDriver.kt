@@ -293,6 +293,11 @@ class JdbcCursor(val resultSet: ResultSet) : SqlCursor {
   override fun getString(index: Int): String? = resultSet.getString(index + 1)
   override fun getBytes(index: Int): ByteArray? = resultSet.getBytes(index + 1)
   override fun getBoolean(index: Int): Boolean? = getAtIndex(index, resultSet::getBoolean)
+  override fun getColumnsCount(): Int = -1
+
+  override fun getColumnName(index: Int) = null
+
+  override fun getType(index: Int): Int = -1
   fun getByte(index: Int): Byte? = getAtIndex(index, resultSet::getByte)
   fun getShort(index: Int): Short? = getAtIndex(index, resultSet::getShort)
   fun getInt(index: Int): Int? = getAtIndex(index, resultSet::getInt)

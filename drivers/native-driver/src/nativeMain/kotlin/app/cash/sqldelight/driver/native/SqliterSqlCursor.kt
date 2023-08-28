@@ -27,4 +27,10 @@ internal class SqliterSqlCursor(private val cursor: Cursor) : SqlCursor {
   }
 
   override fun next(): QueryResult.Value<Boolean> = QueryResult.Value(cursor.next())
+
+  override fun getColumnsCount(): Int = cursor.columnCount
+
+  override fun getColumnName(index: Int): String = cursor.columnName(index)
+
+  override fun getType(index: Int): Int = cursor.getType(index).nativeCode
 }

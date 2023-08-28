@@ -137,6 +137,12 @@ private class JsSqlCursor(private val statement: Statement) : SqlCursor {
     }
   }
 
+  override fun getColumnsCount(): Int = -1
+
+  override fun getColumnName(index: Int) = null
+
+  override fun getType(index: Int): Int = -1
+
   fun close() { statement.freemem() }
 }
 

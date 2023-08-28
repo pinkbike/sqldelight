@@ -186,7 +186,9 @@ class NativeSqliteDriver(
 
   override fun notifyListeners(vararg queryKeys: String) {
     val listenersToNotify = mutableSetOf<Query.Listener>()
-    queryKeys.forEach { key -> listeners.get(key)?.let { listenersToNotify.addAll(it.keys) } }
+    queryKeys.forEach { key -> listeners.get(key)?.let {
+        listenersToNotify.addAll(it.keys.filterNotNull())
+    } }
     listenersToNotify.forEach(Query.Listener::queryResultsChanged)
   }
 
