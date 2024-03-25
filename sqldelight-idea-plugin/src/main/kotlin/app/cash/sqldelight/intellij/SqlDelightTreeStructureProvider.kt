@@ -23,8 +23,8 @@ import com.intellij.openapi.vfs.VirtualFileFilter
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
-import org.jetbrains.kotlin.konan.file.File
 import java.util.ArrayList
+import org.jetbrains.kotlin.konan.file.File
 
 internal class SqlDelightTreeStructureProvider(
   private val project: Project,
@@ -107,7 +107,9 @@ internal class SqlDelightTreeStructureProvider(
       selected.forEach {
         if (it is SqlDelightPackageNode) {
           addAll(it.elements)
-        } else if (it.value is PsiElement) add(it.value as PsiElement)
+        } else if (it.value is PsiElement) {
+          add(it.value as PsiElement)
+        }
       }
     }.toTypedArray()
 
