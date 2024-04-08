@@ -326,6 +326,12 @@ internal constructor(private val results: AsyncPublisherIterator<List<Any?>>) : 
 
   override fun getBoolean(index: Int): Boolean? = get(index)
 
+  override fun getColumnsCount(): Int = -1
+
+  override fun getColumnName(index: Int): String? = null
+
+  override fun getType(index: Int): Int = -1
+
   inline fun <reified T : Any> getObject(index: Int): T? = get(index)
 
   fun <T> getArray(index: Int): Array<T>? = get(index)

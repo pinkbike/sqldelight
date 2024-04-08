@@ -179,6 +179,11 @@ internal class JsWorkerSqlCursor(private val values: Array<Array<dynamic>>) : Sq
   override fun getDouble(index: Int): Double? = values[currentRow][index].unsafeCast<Double?>()
 
   override fun getBoolean(index: Int): Boolean? = values[currentRow][index].unsafeCast<Boolean?>()
+  override fun getColumnsCount(): Int = -1
+
+  override fun getColumnName(index: Int): String? = null
+
+  override fun getType(index: Int): Int = -1
 }
 
 internal class JsWorkerSqlPreparedStatement : SqlPreparedStatement {
