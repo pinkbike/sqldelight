@@ -5,6 +5,7 @@ import app.cash.sqldelight.Query
 import app.cash.sqldelight.db.OptimisticLockException
 import app.cash.sqldelight.driver.jdbc.JdbcDriver
 import com.google.common.truth.Truth.assertThat
+import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.DriverManager
 import java.time.Instant
@@ -32,11 +33,9 @@ class PostgreSqlTest {
     driver,
     arraysAdapter = Arrays.Adapter(
       object : ColumnAdapter<Array<UInt>, Array<Int>> {
-        override fun decode(databaseValue: Array<Int>): Array<UInt> =
-          databaseValue.map { it.toUInt() }.toTypedArray()
+        override fun decode(databaseValue: Array<Int>): Array<UInt> = databaseValue.map { it.toUInt() }.toTypedArray()
 
-        override fun encode(value: Array<UInt>): Array<Int> =
-          value.map { it.toInt() }.toTypedArray()
+        override fun encode(value: Array<UInt>): Array<Int> = value.map { it.toInt() }.toTypedArray()
       },
     ),
     data_Adapter = Data_.Adapter(
@@ -375,9 +374,45 @@ class PostgreSqlTest {
   }
 
   @Test fun testArrays() {
-    with(database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two")).executeAsOne()) {
+    with(database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two"), arrayOf("a", "b")).executeAsOne()) {
       assertThat(intArray!!.asList()).containsExactly(1u, 2u).inOrder()
       assertThat(textArray!!.asList()).containsExactly("one", "two").inOrder()
+      assertThat(vcharArray!!.asList()).containsExactly("a", "b").inOrder()
+    }
+  }
+
+  @Test fun testArrayContains() {
+    database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two"), arrayOf("a", "b")).executeAsOne()
+    with(database.arraysQueries.contains(arrayOf(1u, 2u), arrayOf("a", "b")).executeAsList()) {
+      assertThat(first().expr).isTrue()
+      assertThat(first().expr_).isTrue()
+    }
+  }
+
+  @Test fun testArrayContainsFirst() {
+    database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two"), arrayOf("a", "b")).executeAsOne()
+    with(database.arraysQueries.containsFirst(arrayOf(1u, 2u)).executeAsList()) {
+      assertThat(first().intArray!!.asList()).containsExactly(1u, 2u).inOrder()
+      assertThat(first().textArray!!.asList()).containsExactly("one", "two").inOrder()
+      assertThat(first().vcharArray!!.asList()).containsExactly("a", "b").inOrder()
+    }
+  }
+
+  @Test fun testArrayContainsSecond() {
+    database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two"), arrayOf("a", "b")).executeAsOne()
+    with(database.arraysQueries.containsSecond(arrayOf("a", "b")).executeAsList()) {
+      assertThat(first().intArray!!.asList()).containsExactly(1u, 2u).inOrder()
+      assertThat(first().textArray!!.asList()).containsExactly("one", "two").inOrder()
+      assertThat(first().vcharArray!!.asList()).containsExactly("a", "b").inOrder()
+    }
+  }
+
+  @Test fun testArrayOverlaps() {
+    database.arraysQueries.insertAndReturn(arrayOf(1u, 2u), arrayOf("one", "two"), arrayOf("a", "b")).executeAsOne()
+    with(database.arraysQueries.overlaps(arrayOf(1u, 2u)).executeAsList()) {
+      assertThat(first().intArray!!.asList()).containsExactly(1u, 2u).inOrder()
+      assertThat(first().textArray!!.asList()).containsExactly("one", "two").inOrder()
+      assertThat(first().vcharArray!!.asList()).containsExactly("a", "b").inOrder()
     }
   }
 
@@ -385,6 +420,16 @@ class PostgreSqlTest {
     val now = database.datesQueries.selectNow().executeAsOne()
     assertThat(now).isNotNull()
     assertThat(now).isGreaterThan(OffsetDateTime.MIN)
+  }
+
+  @Test fun testDateLiteral() {
+    val dateLiteral = database.datesQueries.selectDateLiteral().executeAsOne()
+    assertThat(dateLiteral).isEqualTo(LocalDate.of(2023, 5, 15))
+  }
+
+  @Test fun testTimeLiteral() {
+    val timeLiteral = database.datesQueries.selectTimeLiteral().executeAsOne()
+    assertThat(timeLiteral).isEqualTo(LocalTime.of(10, 30, 45, 0))
   }
 
   @Test fun nowPlusInterval() {
@@ -396,20 +441,19 @@ class PostgreSqlTest {
   @Test fun interval() {
     val interval = database.datesQueries.selectInterval().executeAsOne()
     assertThat(interval).isNotNull()
-    assertThat(interval.getDays()).isEqualTo(1)
+    assertThat(interval).isEqualTo("1 day")
   }
 
   @Test fun intervalBinaryMultiplyExpression() {
     val interval = database.datesQueries.selectMultiplyInterval().executeAsOne()
     assertThat(interval).isNotNull()
-    assertThat(interval.getDays()).isEqualTo(31)
+    assertThat(interval).isEqualTo("31 days")
   }
 
   @Test fun intervalBinaryAddExpression() {
     val interval = database.datesQueries.selectAddInterval().executeAsOne()
     assertThat(interval).isNotNull()
-    assertThat(interval.getDays()).isEqualTo(1)
-    assertThat(interval.getHours()).isEqualTo(3)
+    assertThat(interval).isEqualTo("1 day 03:00:00")
   }
 
   @Test fun successfulOptimisticLock() {
@@ -784,6 +828,75 @@ class PostgreSqlTest {
   }
 
   @Test
+  fun testSelectJsonFuncs() {
+    database.jsonQueries.insertJsonFunc(1, "a")
+    with(database.jsonQueries.selectJsonFunc(1).executeAsOne()) {
+      assertThat(expr).isEqualTo("""{"id":1,"t":"a"}""")
+      assertThat(to_json).isEqualTo(""""a"""")
+      assertThat(expr_).isEqualTo("""{"t": "a", "id": 1}""")
+      assertThat(expr__).isEqualTo("""{"id":1,"t":"a"}""")
+    }
+  }
+
+  @Test
+  fun testSelectJsonExtractionBinds() {
+    database.jsonQueries.insertLiteral("""{"a": { "b": "bb" } }""", """{"a": { "b": "bb" } }""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonExtractionBinds("""{ "c": "cc" }""").executeAsList()) {
+      assertThat(first().ab).isEqualTo(""""bb"""")
+      assertThat(first().abb).isEqualTo("""{"b": "bb", "c": "cc"}""")
+    }
+  }
+
+  @Test
+  fun testSelectJsonExtractionExistsBinds() {
+    database.jsonQueries.insertLiteral("""{"a": { "b": "bb" } }""", """{"a": { "b": "bb" } }""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonExtractionExistsBinds("b", "a", "bb").executeAsList()) {
+      assertThat(first().a).isEqualTo("""{ "b": "bb" }""")
+      assertThat(first().b).isEqualTo(""""bb"""")
+    }
+  }
+
+  @Test
+  fun testSelectJsonExtractionContainsBinds() {
+    database.jsonQueries.insertLiteral("""{"a": { "b": "bb" } }""", """{"a": { "b": "bb" } }""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonExtractionContainsBinds("b", """"bb"""").executeAsList()) {
+      assertThat(first()).isEqualTo("""{"a": {"b": "bb"}}""")
+    }
+  }
+
+  @Test
+  fun testJsonAggFilter() {
+    database.jsonQueries.insertLiteral("""{"color":"red","size":"small","in_stock":true}""", """{}""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonAggFilterWhere().executeAsList()) {
+      assertThat(first()).isEqualTo("""[{"color":"red","size":"small","in_stock":true}]""")
+    }
+  }
+
+  @Test
+  fun testJsonbAggFilter() {
+    database.jsonQueries.insertLiteral("""{}""", """{"color":"red","size":"small","in_stock":true}""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonbAggFilter().executeAsList()) {
+      assertThat(first()).isEqualTo("""["red"]""")
+    }
+  }
+
+  @Test
+  fun testJsonObjectAggFilterWhere() {
+    database.jsonQueries.insertLiteral("""{"color":"red","size":"small","in_stock":true}""", """{}""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonObjectAggFilterWhere().executeAsList()) {
+      assertThat(first()).isEqualTo("""{ "red" : {"color":"red","size":"small","in_stock":true} }""")
+    }
+  }
+
+  @Test
+  fun testJsonbObjectAgg() {
+    database.jsonQueries.insertLiteral("""{}""", """{"color":"red","size":"small","in_stock":true}""", """{}""", emptyArray<String>())
+    with(database.jsonQueries.selectJsonbObjectAgg().executeAsList()) {
+      assertThat(first()).isEqualTo("""{"red": {"size": "small", "color": "red", "in_stock": true}}""")
+    }
+  }
+
+  @Test
   fun testUpdateSetFromId() {
     database.updatesQueries.insertTest(31)
     database.updatesQueries.insertTest2("X")
@@ -843,7 +956,379 @@ class PostgreSqlTest {
   fun testContactTsVectorRank() {
     database.textSearchQueries.insertLiteral("the rain in spain")
     with(database.textSearchQueries.rank("rain | plain").executeAsList()) {
-      assertThat(first()).isEqualTo("0.030396355")
+      assertThat(first()).isEqualTo(0.030396355)
+    }
+  }
+
+  @Test
+  fun testContactTsQueryRank() {
+    database.textSearchQueries.insertLiteral("Peter Piper picked a peck of pickled peppers")
+    with(database.textSearchQueries.plainToRank("peck").executeAsList()) {
+      assertThat(first().rank).isEqualTo(0.06079271)
+    }
+  }
+
+  @Test
+  fun testQueryPartialComparison() {
+    with(database.textSearchQueries.partialComparison("postgraduate", "postgres:*").executeAsOne()) {
+      assertThat(this).isTrue()
+    }
+  }
+
+  @Test
+  fun testMatchRegExOps() {
+    database.regExOpsQueries.insert("thomas")
+    with(database.regExOpsQueries.matchRegExOps("t.*ma", "T.*ma", "t.*max", "T.*ma").executeAsList()) {
+      assertThat(first().expr).isTrue()
+      assertThat(first().expr_).isTrue()
+      assertThat(first().expr__).isTrue()
+      assertThat(first().expr___).isFalse()
+    }
+  }
+
+  @Test
+  fun testMatchRegExWhere() {
+    database.regExOpsQueries.insert("thomas")
+    with(database.regExOpsQueries.matchRegExWhere("t.*ma").executeAsList()) {
+      assertThat(first()).isEqualTo("thomas")
+    }
+  }
+
+  @Test
+  fun testLike() {
+    database.likeQueries.insert("testing")
+
+    with(database.likeQueries.selectWhereLike("test%").executeAsList()) {
+      assertThat(first()).isEqualTo("testing")
+    }
+
+    with(database.likeQueries.selectWhereLikeRegex().executeAsList()) {
+      assertThat(first()).isEqualTo("testing")
+    }
+
+    with(database.likeQueries.selectLikeRegex().executeAsList()) {
+      assertThat(first().expr).isTrue()
+      assertThat(first().expr_).isFalse()
+    }
+  }
+
+  @Test
+  fun testILike() {
+    database.likeQueries.insert("TESTING")
+
+    with(database.likeQueries.selectWhereILike("test%").executeAsList()) {
+      assertThat(first()).isEqualTo("TESTING")
+    }
+
+    with(database.likeQueries.selectWhereILikeRegex().executeAsList()) {
+      assertThat(first()).isEqualTo("TESTING")
+    }
+
+    with(database.likeQueries.selectILikeRegex().executeAsList()) {
+      assertThat(first().expr).isTrue()
+      assertThat(first().expr_).isFalse()
+    }
+  }
+
+  @Test
+  fun testRankOver() {
+    database.windowFunctionsQueries.insert("t", 2)
+    database.windowFunctionsQueries.insert("q", 3)
+    database.windowFunctionsQueries.insert("p", 1)
+
+    with(database.windowFunctionsQueries.selectRank().executeAsList()) {
+      assertThat(first().name).isEqualTo("q")
+      assertThat(first().rank).isEqualTo(1)
+    }
+  }
+
+  @Test
+  fun testOver() {
+    database.windowFunctionsQueries.insert("a", 10)
+    database.windowFunctionsQueries.insert("b", 11)
+    database.windowFunctionsQueries.insert("c", 12)
+
+    with(database.windowFunctionsQueries.selectOver().executeAsList()) {
+      assertThat(first().name).isEqualTo("c")
+      assertThat(first().dense_rank).isEqualTo(1)
+      assertThat(first().row_num).isEqualTo(1)
+      assertThat(first().lag).isNull()
+      assertThat(first().lead).isEqualTo(11)
+      assertThat(first().ntile).isEqualTo(1)
+      assertThat(first().cume_dist).isEqualTo(0.3333333333333333)
+      assertThat(first().percent_rank).isEqualTo(0)
+    }
+  }
+
+  @Test
+  fun testBooleans() {
+    database.booleansQueries.insert(true)
+
+    with(database.booleansQueries.select().executeAsOne()) {
+      assertThat(expr).isTrue()
+      assertThat(expr_).isFalse()
+      assertThat(expr__).isFalse()
+      assertThat(expr___).isTrue()
+      assertThat(b).isTrue()
+    }
+  }
+
+  @Test
+  fun testAtTimeZone() {
+    val ts = LocalDateTime.of(2001, 2, 16, 20, 38, 40)
+    val tstz = OffsetDateTime.of(2001, 2, 16, 20, 38, 40, 0, ZoneOffset.ofHours(0))
+    database.timeZoneQueries.insert(ts, tstz)
+
+    with(database.timeZoneQueries.select(tstz, ts, "America/Chicago").executeAsOne()) {
+      assertThat(expr).isEqualTo(LocalDateTime.of(2024, 5, 9, 15, 28, 36))
+      assertThat(expr_).isEqualTo(OffsetDateTime.of(2001, 2, 17, 2, 38, 40, 0, ZoneOffset.ofHours(0)))
+      assertThat(expr__).isEqualTo(LocalDateTime.of(2001, 2, 16, 18, 38, 40))
+      assertThat(expr___).isEqualTo(OffsetDateTime.of(2001, 2, 17, 2, 38, 40, 0, ZoneOffset.ofHours(0)))
+      assertThat(expr____).isEqualTo(OffsetDateTime.of(2001, 2, 17, 2, 38, 40, 0, ZoneOffset.ofHours(0)))
+      assertThat(expr_____).isEqualTo(LocalDateTime.of(2001, 2, 16, 13, 38, 40))
+      assertThat(expr______).isGreaterThan(LocalDateTime.MIN)
+      assertThat(expr_______).isGreaterThan(LocalDateTime.MIN)
+      assertThat(expr________).isEqualTo(LocalDateTime.of(2001, 2, 16, 14, 38, 40))
+      assertThat(expr_________).isEqualTo(OffsetDateTime.of(2001, 2, 17, 2, 38, 40, 0, ZoneOffset.ofHours(0)))
+    }
+  }
+
+  @Test
+  fun testDataTypeCasts() {
+    database.dataTypeCastsQueries.insert("42", null)
+
+    with(database.dataTypeCastsQueries.select(42).executeAsOne()) {
+      assertThat(expr).isEqualTo("1")
+      assertThat(expr_).isEqualTo("3.14")
+      assertThat(expr__).isEqualTo(42)
+      assertThat(expr___).isFalse()
+      assertThat(expr____).isTrue()
+      assertThat(expr_____).isEqualTo(LocalDateTime.of(2023, 5, 1, 12, 34, 56))
+      assertThat(expr______).isEqualTo(java.util.UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
+      assertThat(expr_______).isEqualTo("""{"a":42}""")
+      assertThat(expr________).isEqualTo(arrayOf(1, 2, 3))
+      assertThat(expr_________).isEqualTo(42L)
+      assertThat(expr__________).isEqualTo(3.14)
+      assertThat(expr___________).isFalse()
+      assertThat(expr____________).isEqualTo("hello")
+      assertThat(expr_____________).isEqualTo(OffsetDateTime.of(2023, 4, 25, 8, 30, 0, 0, ZoneOffset.ofHours(0)))
+      assertThat(expr______________).isEqualTo(LocalDate.of(2023, 4, 25))
+      assertThat(expr_______________).isEqualTo(42)
+      assertThat(expr________________).isNull()
+      assertThat(expr_________________).isEqualTo(42)
+    }
+  }
+
+  @Test
+  fun testXml() {
+    val a = "<?xml version=\"1.0\"?><book><title>Manual</title><chapter>test</chapter></book>"
+    val b = "<book><title>Manual</title><chapter>test</chapter></book>"
+    database.xmlQueries.insert(a, b)
+    with(database.xmlQueries.select().executeAsOne()) {
+      assertThat(x1).isEqualTo(b) // results are returned without <?xml...?>
+      assertThat(x2).isEqualTo(b)
+    }
+  }
+
+  @Test
+  fun testExtract() {
+    val sa = OffsetDateTime.of(2001, 2, 16, 19, 30, 0, 0, ZoneOffset.ofHours(0))
+    val ea = OffsetDateTime.of(2001, 2, 16, 20, 30, 0, 0, ZoneOffset.ofHours(0))
+    val cd = LocalDate.of(2001, 2, 16)
+
+    database.extractQueries.insert(sa, ea, cd)
+
+    with(database.extractQueries.select().executeAsOne()) {
+      assertThat(expr).isEqualTo(5)
+      assertThat(expr_).isEqualTo(2023)
+      assertThat(expr__).isEqualTo(93600)
+      assertThat(expr___).isEqualTo(20)
+      assertThat(expr____).isEqualTo(38)
+      assertThat(expr_____).isEqualTo(16)
+      assertThat(expr______).isEqualTo(5)
+      assertThat(expr_______).isEqualTo(10)
+      assertThat(expr________).isEqualTo(3)
+    }
+  }
+
+  @Test
+  fun testSelectDistinctOn() {
+    val studentExpected = Student(1000, "Test Student")
+    val gradeExpected = Grade(4000, studentExpected.student_id, 5, LocalDateTime.of(1980, 1, 1, 1, 0, 0))
+    database.distinctOnQueries.insertStudent(studentExpected)
+    database.distinctOnQueries.insertGrade(gradeExpected)
+
+    with(database.distinctOnQueries.selectDistinctOnStudent().executeAsOne()) {
+      assertThat(student_id).isEqualTo(studentExpected.student_id)
+      assertThat(name).isEqualTo(studentExpected.name)
+      assertThat(grade_id).isEqualTo(gradeExpected.grade_id)
+      assertThat(grade).isEqualTo(gradeExpected.grade)
+      assertThat(grade_date).isEqualTo(gradeExpected.grade_date)
+    }
+
+    with(database.distinctOnQueries.selectDistinctOnStudentGradeDate().executeAsOne()) {
+      assertThat(student_id).isEqualTo(studentExpected.student_id)
+      assertThat(name).isEqualTo(studentExpected.name)
+      assertThat(grade_id).isEqualTo(gradeExpected.grade_id)
+      assertThat(grade).isEqualTo(gradeExpected.grade)
+      assertThat(grade_date).isEqualTo(gradeExpected.grade_date)
+    }
+  }
+
+  @Test
+  fun testLateralJoin() {
+    database.lateralQueries.insertSales()
+    with(database.lateralQueries.selectSales().executeAsList()) {
+      assertThat(first().salesperson_id).isEqualTo(1)
+      assertThat(first().full_name).isEqualTo("A D")
+      assertThat(first().home_region_id).isEqualTo(1)
+      assertThat(first().home_region_name).isEqualTo("North America")
+      assertThat(first().total_sales).isEqualTo(BigDecimal("1000.50"))
+    }
+  }
+
+  @Test
+  fun testSelectAppointments() {
+    val slotBegin = LocalDateTime.of(2009, 1, 1, 9, 0).atOffset(ZoneOffset.UTC)
+    val slotEnd = slotBegin.plusMinutes(30)
+
+    database.temporalRangesQueries.insert("[$slotBegin, $slotEnd)")
+    database.temporalRangesQueries.insert("[$slotEnd, ${slotEnd.plusMinutes(30)})")
+
+    with(database.temporalRangesQueries.appointments().executeAsList()) {
+      assertThat(first().begin).isEqualTo(slotBegin)
+      assertThat(first().end).isEqualTo(slotEnd)
+    }
+
+    val multiRangeSlots = "{[$slotBegin, $slotEnd), [$slotEnd, ${slotEnd.plusMinutes(30)})}"
+    with(database.temporalRangesQueries.selectAvailableAppointments(multiRangeSlots, "[$slotBegin, $slotEnd)").executeAsList()) {
+      assertThat(first()).isEqualTo("""{["2009-01-01 09:30:00+00","2009-01-01 10:00:00+00")}""")
+    }
+
+    with(database.temporalRangesQueries.selectAppointmentContainsRange().executeAsList()) {
+      assertThat(first()).isFalse()
+    }
+  }
+
+  @Test
+  fun testSelectContainsTemporalRange() {
+    with(database.temporalRangesQueries.selectMultiRangeContainsTimestamp().executeAsList()) {
+      assertThat(first()).isTrue()
+    }
+  }
+
+  @Test
+  fun testUnnestSelect() {
+    database.unnestQueries.insertBusiness("Ok Burger", arrayOf("A12345", "AB5522", "T74134"), arrayOf(76, 12, 18))
+    with(database.unnestQueries.selectHeadcount().executeAsList()) {
+      assertThat(first().headcount).isEqualTo(76)
+    }
+  }
+
+  @Test
+  fun testUnnestSelectFrom() {
+    database.unnestQueries.insertBusiness("Ok Burger", arrayOf("A12345", "AB5522", "T74134"), arrayOf(6, 12, 18))
+    with(database.unnestQueries.selectBusinesses().executeAsList()) {
+      assertThat(first().name).isEqualTo("Ok Burger")
+      assertThat(first().zipcode).isEqualTo("A12345")
+      assertThat(first().headcount).isEqualTo(6)
+    }
+    with(database.unnestQueries.selectLocation("AB5522").executeAsList()) {
+      assertThat(first().name).isEqualTo("Ok Burger")
+    }
+  }
+
+  @Test
+  fun testUnnestInsertSelect() {
+    database.unnestQueries.insertUsers(arrayOf("Aaaa", "Bbbb", "Cccc"), arrayOf(32, 21, 65))
+    with(database.unnestQueries.selectUserProfiles().executeAsList()) {
+      assertThat(first().name).isEqualTo("Aaaa")
+      assertThat(first().age).isEqualTo(32)
+    }
+  }
+
+  @Test
+  fun testUnnestUpdate() {
+    database.unnestQueries.insertUsers(arrayOf("Aaaa", "Bbbb", "Cccc"), arrayOf(32, 21, 65))
+    database.unnestQueries.updateUsersAge(arrayOf("Aaaa"), arrayOf(39))
+    with(database.unnestQueries.selectUserProfiles().executeAsList()) {
+      assertThat(first().name).isEqualTo("Aaaa")
+      assertThat(first().age).isEqualTo(39)
+    }
+  }
+
+  @Test
+  fun testUnnestDelete() {
+    database.unnestQueries.insertUsers(arrayOf("Aaaa", "Bbbb", "Cccc"), arrayOf(32, 21, 65))
+    database.unnestQueries.deleteUsers(arrayOf("Aaaa"), arrayOf(32))
+    with(database.unnestQueries.selectUserProfiles().executeAsList()) {
+      assertThat(first().name).isEqualTo("Bbbb")
+      assertThat(first().age).isEqualTo(21)
+    }
+  }
+
+  @Test
+  fun testUnnestWhere() {
+    database.unnestQueries.insertBusiness("Ok Burger", arrayOf("A12345", "AB5522", "T74134"), arrayOf(6, 12, 18))
+    database.unnestQueries.insertBusiness("Donut Hut", arrayOf("N12345", "QB7536", "P31879"), arrayOf(6, 12, 18))
+    with(database.unnestQueries.selectBusinessExists("P31879").executeAsList()) {
+      assertThat(first().name).isEqualTo("Donut Hut")
+    }
+  }
+
+  @Test
+  fun testJsonChecks() {
+    database.jsonQueries.insertTestJsonCheck()
+    with(database.jsonQueries.selectJsonChecks().executeAsList()) {
+      assertThat(first().null_).isFalse()
+      assertThat(first().not_null_).isTrue()
+      assertThat(first().json_).isTrue()
+      assertThat(first().value_).isTrue()
+      assertThat(first().not_json_).isFalse()
+      assertThat(first().scalar_).isFalse()
+      assertThat(first().object_).isTrue()
+      assertThat(first().not_object_).isFalse()
+      assertThat(first().array_).isFalse()
+      assertThat(first().array_with_unq_key_).isFalse()
+      assertThat(first().array_without_unq_key_).isFalse()
+    }
+  }
+
+  @Test
+  fun testEnums() {
+    val low = database.enumsQueries.insert(111, "Testing Low", "low").executeAsOne()
+    val med = database.enumsQueries.insert(122, "Testing Medium", "medium").executeAsOne()
+    val high = database.enumsQueries.insert(133, "Testing High", "high").executeAsOne()
+    database.enumsQueries.select().executeAsList().let {
+      assertThat(it).containsExactly(low, med, high)
+    }
+  }
+
+  @Test
+  fun testEnumsArg() {
+    val low = database.enumsQueries.insert(111, "Testing Low", "low").executeAsOne()
+    val med = database.enumsQueries.insert(122, "Testing Medium", "medium").executeAsOne()
+    val high = database.enumsQueries.insert(133, "Testing High", "high").executeAsOne()
+    database.enumsQueries.selectByPriority("medium").executeAsList().let {
+      assertThat(it).containsExactly(med)
+    }
+  }
+
+  @Test
+  fun testEnumsMin() {
+    val low = database.enumsQueries.insert(111, "Testing Low", "low").executeAsOne()
+    val med = database.enumsQueries.insert(122, "Testing Medium", "medium").executeAsOne()
+    val high = database.enumsQueries.insert(133, "Testing High", "high").executeAsOne()
+    database.enumsQueries.selectMinPriority().executeAsList().let {
+      assertThat(it).containsExactly(low)
+    }
+  }
+
+  fun testEnumsFunctions() {
+    database.enumsQueries.selectEnumValues().executeAsOne().let {
+      assertThat(it.values).isEqualTo("{low,medium,high}")
+      assertThat(it.first_value).isEqualTo("low")
+      assertThat(it.last_value).isEqualTo("high")
     }
   }
 }

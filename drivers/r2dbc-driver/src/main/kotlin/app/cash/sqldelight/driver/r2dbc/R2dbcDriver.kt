@@ -255,8 +255,7 @@ class R2dbcPreparedStatement(val statement: Statement) : SqlPreparedStatement {
   }
 }
 
-internal fun <T : Any> Publisher<T>.asIterator(): AsyncPublisherIterator<T> =
-  AsyncPublisherIterator(this)
+internal fun <T : Any> Publisher<T>.asIterator(): AsyncPublisherIterator<T> = AsyncPublisherIterator(this)
 
 internal class AsyncPublisherIterator<T : Any>(
   pub: Publisher<T>,
@@ -299,7 +298,9 @@ internal class AsyncPublisherIterator<T : Any>(
 }
 
 class R2dbcCursor
-internal constructor(private val results: AsyncPublisherIterator<List<Any?>>) : SqlCursor {
+internal constructor(
+  private val results: AsyncPublisherIterator<List<Any?>>,
+) : SqlCursor {
   private lateinit var currentRow: List<Any?>
 
   override fun next(): QueryResult.AsyncValue<Boolean> = QueryResult.AsyncValue {

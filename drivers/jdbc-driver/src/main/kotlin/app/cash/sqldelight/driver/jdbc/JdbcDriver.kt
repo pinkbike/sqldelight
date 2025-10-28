@@ -61,20 +61,26 @@ interface ConnectionManager {
     val connection: Connection,
   ) : Transacter.Transaction() {
     override fun endTransaction(successful: Boolean): QueryResult<Unit> {
-      if (enclosingTransaction == null) {
-        if (successful) {
-          connectionManager.apply { connection.endTransaction() }
-        } else {
-          connectionManager.apply { connection.rollbackTransaction() }
+      try {
+        if (enclosingTransaction == null) {
+          if (successful) {
+            connectionManager.apply { connection.endTransaction() }
+          } else {
+            connectionManager.apply { connection.rollbackTransaction() }
+          }
         }
+        // properly rotate the transaction even if there are uncaught errors
+      } finally {
+        connectionManager.transaction = enclosingTransaction
       }
-      connectionManager.transaction = enclosingTransaction
       return QueryResult.Unit
     }
   }
 }
 
-abstract class JdbcDriver : SqlDriver, ConnectionManager {
+abstract class JdbcDriver :
+  SqlDriver,
+  ConnectionManager {
   override fun close() {
   }
 
@@ -324,8 +330,7 @@ class JdbcCursor(val resultSet: ResultSet) : SqlCursor {
   @Suppress("UNCHECKED_CAST")
   fun <T> getArray(index: Int) = getAtIndex(index, resultSet::getArray)?.array as Array<T>?
 
-  private fun <T> getAtIndex(index: Int, converter: (Int) -> T): T? =
-    converter(index + 1).takeUnless { resultSet.wasNull() }
+  private fun <T> getAtIndex(index: Int, converter: (Int) -> T): T? = converter(index + 1).takeUnless { resultSet.wasNull() }
 
   override fun next(): QueryResult.Value<Boolean> = QueryResult.Value(resultSet.next())
 }

@@ -218,8 +218,7 @@ class SqlDelightEnvironment(
       }
   }
 
-  private fun errorMessage(element: PsiElement, message: String): String =
-    "${element.containingFile.virtualFile.path}: (${element.lineStart}, ${element.charPositionInLine}): $message\n${detailText(element)}"
+  private fun errorMessage(element: PsiElement, message: String): String = "${element.containingFile.virtualFile.path}:${element.lineStart}:${element.charPositionInLine} $message\n${detailText(element)}"
 
   private fun detailText(element: PsiElement) = try {
     val context = context(element) ?: element
@@ -229,13 +228,15 @@ class SqlDelightEnvironment(
     val maxDigits = (log10(context.lineEnd.toDouble()) + 1).toInt()
     for (line in context.lineStart..context.lineEnd) {
       if (!tokenizer.hasMoreTokens()) break
-      result.append(("%0${maxDigits}d    %s\n").format(line, tokenizer.nextToken()))
+      val lineValue = tokenizer.nextToken()
+      result.append(("%0${maxDigits}d    %s\n").format(line, lineValue))
       if (element.lineStart == element.lineEnd && element.lineStart == line) {
-        // If its an error on a single line highlight where on the line.
+        // If it's an error on a single line highlight where on the line.
         result.append(("%${maxDigits}s    ").format(""))
-        if (element.charPositionInLine > 0) {
-          result.append(("%${element.charPositionInLine}s").format(""))
-        }
+        // Print tabs when you see it, spaces for everything else.
+        lineValue.subSequence(0 until element.charPositionInLine)
+          .map { char -> if (char != '\t') " " else char }
+          .forEach(result::append)
         result.append(("%s\n").format("^".repeat(element.textLength)))
       }
     }
@@ -266,14 +267,13 @@ class SqlDelightEnvironment(
       return file.getLineNumber(textOffset + textLength) + 1
     }
 
-  private fun context(element: PsiElement?): PsiElement? =
-    when (element) {
-      null -> element
-      is SqlCreateTableStmt -> element
-      is SqlStmt -> element
-      is SqlDelightImportStmt -> element
-      else -> context(element.parent)
-    }
+  private fun context(element: PsiElement?): PsiElement? = when (element) {
+    null -> element
+    is SqlCreateTableStmt -> element
+    is SqlStmt -> element
+    is SqlDelightImportStmt -> element
+    else -> context(element.parent)
+  }
 
   sealed class CompilationStatus {
     object Success : CompilationStatus()
@@ -341,10 +341,8 @@ class SqlDelightEnvironment(
       )
     }
 
-    override fun sourceFolders(file: VirtualFile, includeDependencies: Boolean) =
-      if (includeDependencies) virtualDirectoriesWithDependencies else virtualDirectories
+    override fun sourceFolders(file: VirtualFile, includeDependencies: Boolean) = if (includeDependencies) virtualDirectoriesWithDependencies else virtualDirectories
 
-    override fun sourceFolders(file: SqlDelightFile, includeDependencies: Boolean) =
-      if (includeDependencies) directoriesWithDependencies else directories
+    override fun sourceFolders(file: SqlDelightFile, includeDependencies: Boolean) = if (includeDependencies) directoriesWithDependencies else directories
   }
 }
