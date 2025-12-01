@@ -21,4 +21,8 @@ internal actual class WorkerSqlCursor actual constructor(result: WorkerResult) :
   actual override fun getDouble(index: Int): Double? = values[currentRow][index].unsafeCast<Double?>()
 
   actual override fun getBoolean(index: Int): Boolean? = values[currentRow][index].unsafeCast<Boolean?>()
+
+  actual override fun getColumnsCount(): Int = -1
+  actual override fun getColumnName(index: Int): String? = null
+  actual override fun getType(index: Int): Int = -1
 }

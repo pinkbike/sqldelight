@@ -16,4 +16,8 @@ internal expect class WorkerSqlCursor(result: WorkerResult) : SqlCursor {
   override fun getDouble(index: Int): Double?
 
   override fun getBoolean(index: Int): Boolean?
+
+  override fun getColumnsCount(): Int
+  override fun getColumnName(index: Int): String?
+  override fun getType(index: Int): Int
 }

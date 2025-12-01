@@ -47,4 +47,8 @@ internal actual class WorkerSqlCursor actual constructor(
     val column = values[currentRow]?.get(index) ?: return null
     return transformer(column)
   }
+
+  actual override fun getColumnsCount(): Int = -1
+  actual override fun getColumnName(index: Int): String? = null
+  actual override fun getType(index: Int): Int = -1
 }
