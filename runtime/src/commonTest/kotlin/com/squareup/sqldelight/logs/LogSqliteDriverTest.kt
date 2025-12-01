@@ -151,6 +151,12 @@ class FakeSqlCursor : SqlCursor {
   override fun getBoolean(index: Int): Boolean? {
     return null
   }
+
+  override fun getColumnsCount(): Int = 0
+
+  override fun getColumnName(index: Int): String? = null
+
+  override fun getType(index: Int): Int = 0
 }
 
 class FakeTransaction : Transaction() {
